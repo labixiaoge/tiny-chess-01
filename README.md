@@ -2,33 +2,39 @@
 [![rank](https://make.fun/badge/tiny-chess-01/labixiaoge/tiny-chess-01/rank.svg)](https://make.fun/bounty/tiny-chess-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=tiny-chess-01)
 [![reward](https://make.fun/badge/tiny-chess-01/labixiaoge/tiny-chess-01/reward.svg)](https://make.fun/bounty/tiny-chess-01?utm_source=github&utm_medium=readme&utm_campaign=tiny-chess-01)
 
-# Tiny Chess
+# tiny-chess-01
 
-A chess engine in 4,062 bytes of Python for the make.fun bounty
-**"Build the strongest chess engine in 4 KB of Python"**
-(`tiny-chess-01`) by [xiaoge-labi](https://make.fun/u/xiaoge-labi).
-Join make.fun with my referral link: https://make.fun/r/j11gmnzr
+A chess engine in 4,092 bytes of Python 3.13 (stdlib only).
 
-## How it works
+## Design
 
-`main.py` is a single packed file: an LZMA + base85 payload that unpacks
-to the engine at startup. The engine is a 0x88 board with negamax
-alpha-beta search, quiescence over captures and promotions (and every
-reply to a check), a 131,072-entry transposition table, MVV-LVA plus
-killer-move ordering, late-move reductions, incremental piece-square
-evaluation, and iterative deepening to a fixed budget of 60,000 nodes
-a move — never a clock, so replays are identical.
+- 0x88 board, negamax + alpha-beta, quiescence over captures,
+  promotions and check evasions (with delta pruning).
+- Transposition table (2^17 slots, one packed int per entry),
+  MVV-LVA + killer + history move ordering, late-move reductions,
+  null-move pruning, iterative deepening with a FIXED node budget
+  of 100,000 nodes/move (deterministic: no clock, no unseeded
+  randomness).
+- Incremental piece-square-table eval (Michniewski tables),
+  material + PST, bishop-pair bonus (+30), king safety via PST,
+  repetition detection.
+- Speaks the make.fun env protocol (`MAKEFUN_ENV_URL`):
+  `POST /game`, `/move`, `/resign`; UCI moves.
 
-It talks to the trial env over HTTP (`$MAKEFUN_ENV_URL`): `POST /game`
-to start the next game, `POST /move` with the chosen UCI move, and exits
-when every game is over.
+## Files
 
-## Local check
+- `main.py` — the engine, lzma-compressed + base85 (see
+  `dev5/engine.py` in the source repo for the readable form).
+- `LICENSE` — MIT.
 
-```sh
-python3 -c "compile(open('main.py').read(), 'main.py', 'exec'); print(len(open('main.py','rb').read()), 'bytes')"
-```
+## Verification (local, Python 3.12, 1 CPU)
 
-## License
-
-MIT — see `LICENSE`.
+- perft: startpos 20/400/8902/197281; Kiwipete, pos3–6 all OK.
+- Deterministic: same position twice gives the same move.
+- ~35k nodes/s; worst move ~2.1 s at the 100k budget
+  (limit 10 s/move).
+- Practice trials (packed engine, local), 6 games each:
+  trial-0: 4W 0D 2L, Elo ~1,451.
+  trial-1: 3W 0D 3L, Elo ~1,279.
+  trial-2: 3W 0D 3L, Elo ~1,279.
+  Mean ~1,336; all three trials above the 1,200 target.
